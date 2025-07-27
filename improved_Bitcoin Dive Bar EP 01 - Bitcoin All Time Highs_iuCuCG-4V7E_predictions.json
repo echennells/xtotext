@@ -1,0 +1,47 @@
+[
+  {
+    "asset": "BTC",
+    "prediction_type": "price_target",
+    "value": 120000.0,
+    "predicted_date": null,
+    "time_frame": "end_of_year",
+    "time_value": null,
+    "speaker": "Tim B",
+    "confidence": "high",
+    "reasoning": "The Fed has been raising rates since 2022 and Bitcoin kept ripping. I don't think there were many a lot of these trad five people weren't even prepared for this.",
+    "raw_text": "I think we go much higher.",
+    "episode": "Bitcoin Dive Bar EP 01 - Bitcoin All Time Highs",
+    "episode_date": "2025-07-19",
+    "extraction_date": "2025-07-20T12:21:57.093929"
+  },
+  {
+    "asset": "BTC",
+    "prediction_type": "price_target",
+    "value": 115000.0,
+    "predicted_date": null,
+    "time_frame": "None",
+    "time_value": null,
+    "speaker": "Tim B",
+    "confidence": "medium",
+    "reasoning": "There's a bounce happening, and it looks like it's going higher.",
+    "raw_text": "We might go to 115 today.",
+    "episode": "Bitcoin Dive Bar EP 01 - Bitcoin All Time Highs",
+    "episode_date": "2025-07-19",
+    "extraction_date": "2025-07-20T12:21:57.093941"
+  },
+  {
+    "asset": "MSTR",
+    "prediction_type": "price_target",
+    "value": 25.0,
+    "predicted_date": null,
+    "time_frame": "end_of_year",
+    "time_value": null,
+    "speaker": "B-Scars",
+    "confidence": "medium",
+    "reasoning": "I predicted it would go down.",
+    "raw_text": "Winter is going below 25 bucks.",
+    "episode": "Bitcoin Dive Bar EP 01 - Bitcoin All Time Highs",
+    "episode_date": "2025-07-19",
+    "extraction_date": "2025-07-20T12:21:57.093947"
+  }
+]
