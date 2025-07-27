@@ -28,6 +28,7 @@ RETRY_DELAY = 5  # seconds
 WHISPER_MODEL = "large-v3"
 WHISPER_DEVICE = "cuda"
 WHISPER_COMPUTE_TYPE = "float16"
+WHISPER_LANGUAGE = "en"  # Force English transcription
 
 # Instance Setup Script
 SETUP_SCRIPT = """#!/bin/bash

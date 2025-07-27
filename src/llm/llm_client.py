@@ -189,7 +189,11 @@ Extract generous snippets that might contain predictions. Output as JSON."""
         Returns:
             List of extracted predictions
         """
-        system_prompt = """You are extracting price predictions from a Bitcoin podcast transcript.
+        # Check for custom system prompt
+        if hasattr(self, '_custom_system_prompt'):
+            system_prompt = self._custom_system_prompt
+        else:
+            system_prompt = """You are extracting price predictions from a Bitcoin podcast transcript.
 
 TASK: Find predictions where a speaker states their own view about a future price.
 

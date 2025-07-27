@@ -14,6 +14,7 @@ from typing import List, Dict, Any, Optional
 sys.path.insert(0, str(Path(__file__).parent))
 
 from infrastructure.vast_ai.transcription_runner import TranscriptionRunner
+from infrastructure.vast_ai.config import WHISPER_MODEL
 from downloaders.youtube_channel_downloader import YouTubeChannelDownloader
 from predictions.prediction_tracker.tracker_optimized import OptimizedCryptoPredictionTracker as CryptoPredictionTracker
 

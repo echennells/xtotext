@@ -10,7 +10,7 @@ from datetime import datetime
 from .instance_manager import InstanceManager
 from .ssh_connection import SSHConnection
 from .config import (
-    WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE_TYPE,
+    WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE_TYPE, WHISPER_LANGUAGE,
     REMOTE_WORKSPACE, REMOTE_AUDIO_DIR, REMOTE_OUTPUT_DIR
 )
 
@@ -61,7 +61,7 @@ class TranscriptionRunner:
         audio_path: Path,
         output_dir: Optional[Path] = None,
         model: str = WHISPER_MODEL,
-        language: Optional[str] = None,
+        language: Optional[str] = WHISPER_LANGUAGE,
         use_faster_whisper: bool = True
     ) -> Dict[str, Any]:
         """
@@ -166,7 +166,7 @@ class TranscriptionRunner:
         audio_files: List[Path],
         output_dir: Path,
         model: str = WHISPER_MODEL,
-        language: Optional[str] = None
+        language: Optional[str] = WHISPER_LANGUAGE
     ) -> List[Dict[str, Any]]:
         """
         Transcribe multiple audio files in batch
@@ -372,7 +372,7 @@ model = WhisperModel("{model}", device="{WHISPER_DEVICE}", compute_type="{WHISPE
 
 segments, info = model.transcribe(
     "{remote_audio}",
-    language={"'" + language + "'" if language else "None"},
+    language="{language}" if "{language}" else None,
     beam_size=5,
     word_timestamps=True
 )

@@ -13,6 +13,7 @@ sys.path.insert(0, str(project_root / "src"))
 
 from downloaders.youtube_channel_downloader import YouTubeChannelDownloader
 from infrastructure.vast_ai.transcription_runner import TranscriptionRunner
+from infrastructure.vast_ai.config import WHISPER_MODEL
 
 
 def main():
@@ -110,7 +111,7 @@ def main():
         transcript_result = vast_runner.transcribe_audio(
             audio_path=audio_file,
             output_dir=transcript_dir,
-            model="base",
+            model=WHISPER_MODEL,
             use_faster_whisper=True
         )
         
