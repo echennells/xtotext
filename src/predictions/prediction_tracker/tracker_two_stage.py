@@ -9,7 +9,7 @@ from datetime import datetime
 import gc
 import time
 
-from .llm_extractor_two_stage import TwoStageLLMExtractor
+from .llm_extractor_two_stage import TwoStageLLMExtractor, QuotaExceededException
 from .models import Prediction
 from .storage import PredictionStorage
 

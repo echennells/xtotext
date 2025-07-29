@@ -62,6 +62,9 @@ class Prediction:
     prediction_id: Optional[str] = None  # Unique ID
     run_id: Optional[str] = None  # Run ID for tracking different extraction runs
     
+    # Debug info
+    timeframe_parsing_info: Optional[Dict] = None  # Track how timeframe was parsed
+    
     def format_timestamp(self, seconds: float) -> str:
         """Format seconds into YouTube timestamp format (1:23:45)"""
         hours = int(seconds // 3600)

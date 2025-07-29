@@ -115,7 +115,8 @@ def main():
                 'extraction_date': datetime.now().isoformat(),
                 'run_id': run_id,  # Add run_id to track this extraction run
                 'model_used': config.LLM_MODEL,  # Track which model was used
-                'prediction_id': p.prediction_id
+                'prediction_id': p.prediction_id,
+                'timeframe_parsing_info': p.timeframe_parsing_info  # Add debug info
             }
             new_predictions.append(pred_dict)
         except Exception as e:
