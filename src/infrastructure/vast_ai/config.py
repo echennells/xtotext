@@ -8,8 +8,16 @@ from pathlib import Path
 VAST_API_KEY = os.getenv("VAST_API_KEY", "")
 VAST_API_BASE = "https://vast.ai/api/v0"
 
+# If not in env, try to load from main config
+if not VAST_API_KEY:
+    try:
+        from config.config import VAST_API_KEY as CONFIG_VAST_KEY
+        VAST_API_KEY = CONFIG_VAST_KEY
+    except ImportError:
+        pass
+
 # Instance Configuration
-DEFAULT_GPU_TYPE = "RTX 3080"
+DEFAULT_GPU_TYPE = "RTX 3090"  # Changed from 3080 - more availability
 DEFAULT_GPU_COUNT = 1
 DEFAULT_MIN_GPU_RAM = 10  # GB
 DEFAULT_MIN_RAM = 16  # GB

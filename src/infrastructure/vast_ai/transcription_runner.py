@@ -13,6 +13,7 @@ from .config import (
     WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE_TYPE,
     REMOTE_WORKSPACE, REMOTE_AUDIO_DIR, REMOTE_OUTPUT_DIR
 )
+from utils.filename_utils import sanitize_filename
 
 
 class TranscriptionRunner:
@@ -25,36 +26,78 @@ class TranscriptionRunner:
     def setup_instance(
         self,
         gpu_type: str = "RTX 3080",
-        max_price: float = 0.50
+        max_price: float = 0.50,
+        max_retries: int = 3
     ) -> Dict[str, Any]:
         """
-        Set up a GPU instance for transcription
+        Set up a GPU instance for transcription with retry logic
+        
+        Args:
+            gpu_type: Type of GPU to request
+            max_price: Maximum hourly price
+            max_retries: Maximum number of retries for dud instances
         
         Returns:
             Instance details
         """
-        # Create or get existing instance
-        instance = self.instance_manager.create_transcription_instance(
-            gpu_type=gpu_type,
-            max_price=max_price
-        )
+        last_error = None
         
-        # Establish SSH connection
-        self.ssh_connection = SSHConnection(
-            host=instance['ssh_host'],
-            port=instance['ssh_port']
-        )
+        for attempt in range(1, max_retries + 1):
+            print(f"\n{'='*60}")
+            print(f"GPU Instance Setup - Attempt {attempt}/{max_retries}")
+            print(f"{'='*60}")
+            
+            try:
+                # Create or get existing instance
+                instance = self.instance_manager.create_transcription_instance(
+                    gpu_type=gpu_type,
+                    max_price=max_price
+                )
+                
+                # Establish SSH connection
+                self.ssh_connection = SSHConnection(
+                    host=instance['ssh_host'],
+                    port=instance['ssh_port']
+                )
+                
+                # Wait for SSH to be ready with a longer timeout
+                print("Waiting for SSH to be ready (this can take 2-3 minutes)...")
+                print("Waiting 30s for instance to fully boot before SSH attempts...")
+                time.sleep(30)  # Give instance time to fully configure
+                if not self.ssh_connection.wait_for_connection(timeout=600):
+                    raise RuntimeError("Failed to establish SSH connection")
+                
+                # Verify setup completed
+                print("Verifying instance setup...")
+                self._verify_setup()
+                
+                print(f"✓ Instance {instance['id']} successfully set up!")
+                return instance
+                
+            except (TimeoutError, RuntimeError) as e:
+                last_error = e
+                print(f"\n⚠ Attempt {attempt} failed: {str(e)}")
+                
+                # Clean up the failed instance
+                if self.instance_manager.current_instance:
+                    print(f"Destroying failed instance {self.instance_manager.current_instance['id']}...")
+                    try:
+                        self.instance_manager.destroy_current_instance()
+                    except Exception as cleanup_error:
+                        print(f"Warning: Failed to destroy instance: {cleanup_error}")
+                
+                # Reset SSH connection
+                self.ssh_connection = None
+                
+                if attempt < max_retries:
+                    print(f"\nRetrying with a different GPU instance...")
+                    # Wait a bit before retrying
+                    time.sleep(10)
+                else:
+                    print(f"\n✗ All {max_retries} attempts failed. GPU instances appear to be unavailable.")
         
-        # Wait for SSH to be ready with a longer timeout
-        print("Waiting for SSH to be ready (this can take 2-3 minutes)...")
-        if not self.ssh_connection.wait_for_connection(timeout=600):
-            raise RuntimeError("Failed to establish SSH connection")
-        
-        # Verify setup completed
-        print("Verifying instance setup...")
-        self._verify_setup()
-        
-        return instance
+        # All retries exhausted
+        raise RuntimeError(f"Failed to set up GPU instance after {max_retries} attempts. Last error: {last_error}")
     
     def transcribe_audio(
         self,
@@ -62,7 +105,7 @@ class TranscriptionRunner:
         output_dir: Optional[Path] = None,
         model: str = WHISPER_MODEL,
         language: Optional[str] = None,
-        use_faster_whisper: bool = True
+        use_faster_whisper: bool = False
     ) -> Dict[str, Any]:
         """
         Transcribe audio file using GPU instance
@@ -89,9 +132,11 @@ class TranscriptionRunner:
         
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Remote paths
-        remote_audio = f"{REMOTE_AUDIO_DIR}/{audio_path.name}"
-        remote_output_base = f"{REMOTE_OUTPUT_DIR}/{audio_path.stem}"
+        # Remote paths - sanitize filenames to avoid shell issues with special characters
+        sanitized_audio_name = sanitize_filename(audio_path.name)
+        sanitized_stem = sanitize_filename(audio_path.stem, preserve_extension=False)
+        remote_audio = f"{REMOTE_AUDIO_DIR}/{sanitized_audio_name}"
+        remote_output_base = f"{REMOTE_OUTPUT_DIR}/{sanitized_stem}"
         
         print(f"\\nTranscribing {audio_path.name} using {model} model...")
         start_time = time.time()
@@ -123,8 +168,9 @@ class TranscriptionRunner:
                     language
                 )
             
-            # Download results
-            local_output = output_dir / f"{audio_path.stem}_transcript.json"
+            # Download results with sanitized filename
+            sanitized_name = sanitize_filename(f"{audio_path.stem}_transcript.json")
+            local_output = output_dir / sanitized_name
             print("Downloading transcript...")
             if not self.ssh_connection.download_file(transcript_path, local_output):
                 raise RuntimeError("Failed to download transcript")
@@ -264,7 +310,8 @@ if torch.cuda.is_available():
     x = torch.tensor([1.0]).cuda()
     print("CUDA initialization successful")
 else:
-    print("WARNING: CUDA not available!")
+    print("ERROR: CUDA not available! This GPU instance is not functioning properly.")
+    exit(1)
 '''
         ret, out, err = self.ssh_connection.execute_command(
             f"python3 -c '{cuda_test}'", timeout=30
@@ -272,7 +319,8 @@ else:
         if ret != 0:
             print(f"CUDA test output: {out}")
             print(f"CUDA test error: {err}")
-            print("WARNING: CUDA test failed, but continuing...")
+            # CUDA not working means this is a dud instance
+            raise RuntimeError("CUDA is not available on this instance - likely a dud GPU")
         else:
             print(f"CUDA test output: {out}")
         
@@ -285,17 +333,18 @@ else:
         install_script = """
         # Update system and install required packages
         apt-get update -qq
-        apt-get install -y -qq ffmpeg
+        apt-get install -y -qq python3 python3-pip ffmpeg git
         
         # Upgrade pip
-        pip install --upgrade pip
+        python3 -m pip install --upgrade pip
         
         # Install PyTorch with CUDA support first
-        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+        python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
         
         # Install whisper packages
-        pip install openai-whisper
-        pip install faster-whisper
+        python3 -m pip install openai-whisper
+        # Pin faster-whisper to version that works with cuDNN 8
+        python3 -m pip install faster-whisper==0.10.0
         """
         
         ret, out, err = self.ssh_connection.execute_command(
@@ -314,30 +363,67 @@ else:
         language: Optional[str]
     ) -> str:
         """Run standard Whisper transcription"""
+        # First, ensure CUDA is properly initialized
+        cuda_init_script = '''
+import torch
+import os
+# Force CUDA initialization
+if torch.cuda.is_available():
+    torch.cuda.init()
+    torch.cuda.empty_cache()
+    print("CUDA initialized successfully")
+else:
+    print("WARNING: CUDA not available, will use CPU")
+'''
+        print("Initializing CUDA...")
+        ret, out, err = self.ssh_connection.execute_command(
+            f"python3 -c '{cuda_init_script}'", timeout=30
+        )
+        if "CUDA not available" in out:
+            print("WARNING: CUDA not available, switching to CPU mode")
+            device = "cpu"
+        else:
+            device = WHISPER_DEVICE
+            
         cmd_parts = [
             "python3", "-m", "whisper",
-            remote_audio,
+            f'"{remote_audio}"',  # Quote the filename to handle spaces
             "--model", model,
-            "--device", WHISPER_DEVICE,
+            "--device", device,
             "--output_format", "json",
             "--output_dir", REMOTE_OUTPUT_DIR,
-            "--verbose", "False"
+            "--verbose", "False",
+            "--temperature", "0.0",
+            "--beam_size", "5",
+            "--patience", "1.0",
+            "--condition_on_previous_text", "False",
+            "--initial_prompt", '"Discussion about cryptocurrency, Bitcoin, stablecoins, finance, stocks"'
         ]
         
         if language:
             cmd_parts.extend(["--language", language])
+        else:
+            # Default to English if no language specified
+            cmd_parts.extend(["--language", "en"])
         
         cmd = " ".join(cmd_parts)
         
-        print(f"Running Whisper {model} on GPU...")
+        # Set environment variables to ensure CUDA works
+        env_setup = "export CUDA_VISIBLE_DEVICES=0 && export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH && "
+        
+        print(f"Running Whisper {model} on {device.upper()}...")
         ret, out, err = self.ssh_connection.execute_command(
-            cmd,
+            env_setup + cmd,
             stream_output=True,
-            timeout=3600  # 1 hour timeout
+            timeout=7200  # 2 hour timeout for long videos
         )
         
         if ret != 0:
-            raise RuntimeError(f"Whisper failed: {err}")
+            # If it failed, try to provide more context
+            if "CUDA" in str(out) or "cuda" in str(out):
+                raise RuntimeError(f"Whisper failed with CUDA error. This instance likely has a non-functional GPU. Error: {out}")
+            else:
+                raise RuntimeError(f"Whisper failed: {err}")
         
         return f"{remote_output_base}.json"
     
@@ -417,9 +503,9 @@ print(f"Transcription complete. Duration: {{info.duration:.2f}}s")
         
         print(f"Running faster-whisper {model} on GPU...")
         ret, out, err = self.ssh_connection.execute_command(
-            f"cd {REMOTE_WORKSPACE} && python3 transcribe_script.py",
+            f"cd {REMOTE_WORKSPACE} && export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda/lib64:$LD_LIBRARY_PATH && python3 transcribe_script.py",
             stream_output=True,
-            timeout=3600
+            timeout=7200  # 2 hour timeout for long videos
         )
         
         if ret != 0:

@@ -88,7 +88,7 @@ class SSHConnection:
     def wait_for_connection(
         self,
         timeout: int = 300,
-        check_interval: int = 10
+        check_interval: int = 30  # Increased from 10 to 30 seconds
     ) -> bool:
         """
         Wait for SSH connection to become available

@@ -186,6 +186,16 @@ $RECYCLE.BIN/
 *.opus
 *.wav
 *.m4a
+*.avi
+*.mov
+*.mkv
+*.webm
+*.flv
+*.wmv
+*.m4v
+*.mpg
+*.mpeg
+*.3gp
 
 # Downloads and temporary directories
 downloads/
@@ -194,10 +204,10 @@ tmp/
 bitcoin_dive_bar_downloads/
 
 # Data and output directories
-data/episodes/
-data/one_off_downloads/
+data/
 debug_output/
 output/
+output_transcripts/
 
 # Model files and large data
 *.model
@@ -223,8 +233,15 @@ cache.db
 # Episode and transcript data that gets large
 *_transcript.json
 *_transcripts/
+*.transcript
+*.txt
+*.srt
+*.vtt
 episode*_chunk*.txt
 episode*_context*.txt
+
+# Database files
+video_database.json
 
 # Temporary analysis files
 current_droplet.txt

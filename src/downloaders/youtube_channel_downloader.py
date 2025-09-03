@@ -370,6 +370,19 @@ class YouTubeChannelDownloader:
             print(f"Error extracting audio {title}: {e}")
             return False, None
     
+    def download_single_video_by_id(self, video_id: str) -> Tuple[bool, Optional[str]]:
+        """Public method to download a single video by ID
+        Returns: (success, filepath)
+        """
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        # Get video title
+        cmd = ["yt-dlp", "--get-title", url]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        title = result.stdout.strip() if result.returncode == 0 else f"video_{video_id}"
+        
+        return self._download_single_video(video_id, title, url)
+    
     def _download_single_video(self, video_id: str, title: str, url: str) -> Tuple[bool, Optional[str]]:
         """Download a single video
         Returns: (success, filepath)

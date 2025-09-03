@@ -22,6 +22,8 @@ sys.path.insert(0, str(project_root / "src"))
 
 from infrastructure.digital_ocean.simple_runner import SimpleDigitalOceanRunner
 from downloaders.youtube_channel_downloader import YouTubeChannelDownloader
+from processors.claude_transcript_postprocessor import postprocess_transcript_claude
+from database import get_database, log_video, log_postprocessing
 
 
 def main():
@@ -49,9 +51,9 @@ def main():
     logger.info(f"Starting prediction extraction run - Log file: {log_file}")
     
     # Configuration
-    channel_url = "https://www.youtube.com/@BitcoinDiveBar"
-    local_download_dir = Path("data/episodes/bitcoin_dive_bar_downloads")
-    output_dir = Path("data/episodes/bitcoin_dive_bar_analysis")
+    channel_url = "https://www.youtube.com/@BitcoinTakeover"
+    local_download_dir = Path("data/episodes/bitcoin_takeover_downloads")
+    output_dir = Path("data/episodes/bitcoin_takeover_analysis")
     
     local_download_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -68,7 +70,7 @@ def main():
     
     # Always check for new episodes
     print(f"Checking {channel_url} for new episodes...")
-    download_result = downloader.download_channel(channel_url)  # No max_videos limit
+    download_result = downloader.download_channel(channel_url)  # Process all episodes
     
     if 'new_downloads' in download_result:
         print(f"Downloaded {download_result['new_downloads']} new episodes")
@@ -83,15 +85,16 @@ def main():
     # Get Vast.ai API key for DO droplet to use
     vast_api_key = os.getenv("VAST_API_KEY")
     if not vast_api_key:
-        api_key_file = Path.home() / ".config/vastai/vast_api_key"
-        if api_key_file.exists():
-            vast_api_key = api_key_file.read_text().strip()
+        try:
+            from config.config import VAST_API_KEY
+            vast_api_key = VAST_API_KEY
+        except ImportError:
+            pass
     
     if not vast_api_key:
         print("Error: No Vast.ai API key found (needed for GPU transcription)")
         return
     
-    # Process all episodes
     print(f"\nWill process {len(audio_files)} episodes")
     
     # Create timestamp for this run
@@ -100,16 +103,57 @@ def main():
     # Results tracking
     all_results = []
     
+    # Initialize database
+    db = get_database()
+    
+    # Generate a single run_id for this entire batch (moved up for database logging)
+    batch_run_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+    print(f"Batch run ID: {batch_run_id}")
+    
     # Process each episode
     for i, audio_file in enumerate(audio_files):
         print("\n" + "="*80)
         print(f"EPISODE {i+1}/{len(audio_files)}: {audio_file.name}")
         print("="*80)
         
+        # Extract video ID from filename
+        video_id = None
+        stem = audio_file.stem
+        # YouTube video IDs are always 11 characters
+        if len(stem) >= 11:
+            # Try to find an 11-character alphanumeric string
+            for j in range(len(stem) - 10):
+                potential_id = stem[j:j+11]
+                if all(c.isalnum() or c in '_-' for c in potential_id):
+                    video_id = potential_id
+                    break
+        
+        # Check database first
+        skip_processing = False
+        if video_id:
+            db_entry = db.get_video(f"youtube_{video_id}")
+            if db_entry:
+                print(f"✓ Video already in database: {db_entry.get('title', audio_file.name)}")
+                print(f"  Processed on: {db_entry.get('processed_date', 'Unknown')}")
+                skip_processing = True
+        
         # Check if transcript already exists
         transcripts_dir = output_dir / "transcripts"
         transcripts_dir.mkdir(exist_ok=True)
         transcript_file = transcripts_dir / f"{audio_file.stem}_transcript.json"
+        
+        if skip_processing:
+            print(f"Skipping processing - already in database")
+            # Still track it in results
+            episode_result = {
+                'episode': audio_file.name,
+                'transcript': True,
+                'predictions': True,
+                'error': None,
+                'skipped': True
+            }
+            all_results.append(episode_result)
+            continue
         
         if transcript_file.exists():
             print(f"Transcript already exists, skipping Vast.ai transcription")
@@ -122,11 +166,12 @@ def main():
             vast_runner = TranscriptionRunner(vast_api_key)
             
             try:
-                # Set up GPU instance
+                # Set up GPU instance with retry logic
                 print("Starting Vast.ai GPU instance...")
                 instance = vast_runner.setup_instance(
-                    gpu_type="RTX 3080",
-                    max_price=0.30
+                    gpu_type="RTX 3090",  # Using 3090 for better availability
+                    max_price=0.30,
+                    max_retries=3  # Try up to 3 different instances
                 )
                 print(f"GPU instance {instance['id']} ready")
                 
@@ -135,15 +180,86 @@ def main():
                     audio_path=audio_file,
                     output_dir=transcripts_dir,
                     model="base",
-                    use_faster_whisper=True
+                    use_faster_whisper=False  # Use standard whisper to avoid cuDNN issues
                 )
                 
                 print(f"Transcription completed in {transcript_result['metadata']['transcription_time']:.1f}s")
+                
+            except RuntimeError as e:
+                error_msg = str(e)
+                if any(phrase in error_msg for phrase in [
+                    "Failed to set up GPU instance after",
+                    "CUDA is not available",
+                    "CUDA error",
+                    "GPU not available"
+                ]):
+                    print(f"\n✗ GPU/CUDA issue detected: {e}")
+                    print(f"  Skipping transcription for {audio_file.name}")
+                    logger.error(f"GPU transcription failed for {audio_file.name}: {e}")
+                    # Continue to next file
+                    continue
+                else:
+                    raise  # Re-raise other runtime errors
                 
             finally:
                 # Cleanup GPU immediately after use
                 print("Cleaning up Vast.ai GPU instance...")
                 vast_runner.cleanup(destroy_instance=True)
+        
+        # Step 2.5: Post-process transcript to fix errors
+        postprocessed_file = None
+        if transcript_file.exists():
+            print("\nPost-processing transcript to fix transcription errors...")
+            try:
+                postprocessed_file = postprocess_transcript_claude(
+                    transcript_path=transcript_file
+                )
+                print("✓ Transcript post-processing completed with Claude 3 Haiku")
+            except Exception as e:
+                print(f"⚠ Post-processing failed: {e}")
+                print("  Continuing with original transcript...")
+    
+        # Log to database if we have a transcript
+        if transcript_file.exists() and video_id:
+            try:
+                # Calculate stats
+                with open(transcript_file, 'r') as f:
+                    transcript_data = json.load(f)
+                text = transcript_data.get('text', '')
+                if not text and 'segments' in transcript_data:
+                    text = ' '.join(seg.get('text', '') for seg in transcript_data['segments'])
+                
+                # Log the video
+                db_video_id = log_video(
+                    transcript_path=transcript_file,
+                    title=audio_file.stem.replace('_', ' '),
+                    url=f"https://www.youtube.com/watch?v={video_id}" if video_id else None,
+                    platform='youtube',
+                    category='bitcoin',
+                    source_script='main.py',
+                    processing_stats={
+                        'word_count': len(text.split()),
+                        'char_count': len(text),
+                        'vast_ai_cost': 0.10,  # Approximate
+                    },
+                    metadata={
+                        'channel': 'Bitcoin Dive Bar',
+                        'batch_run_id': batch_run_id
+                    }
+                )
+                
+                # Log post-processing if it happened
+                if postprocessed_file and postprocessed_file.exists():
+                    log_postprocessing(
+                        video_id=db_video_id,
+                        postprocessed_path=postprocessed_file,
+                        model='claude-3-haiku',
+                        cost=0.02  # Approximate
+                    )
+                
+                print(f"✓ Added to database: {db_video_id}")
+            except Exception as e:
+                print(f"⚠ Failed to log to database: {e}")
     
         # After processing this episode, track result
         episode_result = {
@@ -158,10 +274,6 @@ def main():
     print("\n" + "="*80)
     print("STEP 3: Extracting predictions on Digital Ocean")
     print("="*80)
-    
-    # Generate a single run_id for this entire batch
-    batch_run_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-    print(f"Batch run ID: {batch_run_id}")
     
     # Create runner without context manager so we can control cleanup
     runner = SimpleDigitalOceanRunner()
@@ -191,7 +303,16 @@ def main():
                 continue
                 
             audio_file = Path(local_download_dir) / result['episode']
-            transcript_file = transcripts_dir / f"{audio_file.stem}_transcript.json"
+            # Use the postprocessed transcript if it exists, otherwise use original
+            postprocessed_file = transcripts_dir / f"{audio_file.stem}_transcript_claude_postprocessed.json"
+            original_file = transcripts_dir / f"{audio_file.stem}_transcript.json"
+            
+            if postprocessed_file.exists():
+                transcript_file = postprocessed_file
+                print(f"  Using postprocessed transcript: {postprocessed_file.name}")
+            else:
+                transcript_file = original_file
+                print(f"  Using original transcript: {original_file.name}")
             
             print(f"\nProcessing predictions for episode {i+1}: {audio_file.stem}")
             
@@ -407,8 +528,35 @@ BATCH_RUN_ID={batch_run_id} python /workspace/xtotext/scripts/digital_ocean/proc
     print(f"  YouTube files: {local_download_dir}")
     print(f"  Results: {output_dir}")
     
+    # Step 4: Run mention detection on all transcripts
+    print("\n" + "="*80)
+    print("STEP 4: Detecting mentions of Eric Chennells & related terms")
+    print("="*80)
+    
+    from extractors.mention_detector import MentionDetector
+    
+    # Set up paths
+    transcripts_dir = output_dir / "transcripts"
+    mentions_dir = output_dir / "mentions"
+    
+    # Initialize detector
+    detector = MentionDetector()
+    
+    # Run detection
+    mention_summary = detector.process_batch(transcripts_dir, mentions_dir)
+    
+    # Generate report
+    if mention_summary['total_mentions'] > 0:
+        report_path = mentions_dir / "mention_report.txt"
+        detector.generate_report(mention_summary, report_path)
+        print(f"\n✓ Found {mention_summary['total_mentions']} mentions!")
+        print(f"✓ Mention reports saved to: {mentions_dir}")
+    else:
+        print("\n✗ No mentions found")
+    
     logger.info("="*80)
     logger.info(f"Processing complete. Total: {len(all_results)}, Successful: {successful}, Failed: {len(all_results) - successful}")
+    logger.info(f"Mentions found: {mention_summary.get('total_mentions', 0)}")
     logger.info(f"Log file saved to: {log_file}")
     
     print(f"\n📝 Full log saved to: {log_file}")

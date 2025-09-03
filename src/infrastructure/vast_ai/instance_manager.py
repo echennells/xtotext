@@ -174,13 +174,13 @@ class InstanceManager:
         
         print(f"\\nCreating instance from offer {offer['id']}...")
         
-        # Use the template that has the right cuDNN version for faster-whisper
-        template_hash = "b09bff7878753196c7e69a0bf2b916b8"  # Template ID 261658
+        # Try with a basic PyTorch image that should have CUDA
+        # template_hash = "b09bff7878753196c7e69a0bf2b916b8"  # OLD Template - not working
         
-        # Create instance with SSH enabled
+        # Create instance with SSH enabled using PyTorch image
         response = self.client.create_instance(
             offer_id=offer['id'],
-            template_hash=template_hash,
+            image="pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime",  # PyTorch with compatible CUDA/cuDNN
             disk_size=disk_size,
             ssh=True,
             direct=True  # Use direct connection for better performance
@@ -194,14 +194,14 @@ class InstanceManager:
         
         print(f"Waiting for instance {instance_id} to start...")
         print("Note: GPU instances typically take 3-5 minutes to start")
-        print("Will kill and retry if it takes more than 5 minutes...")
+        print("Will wait up to 10 minutes for instance to be ready...")
         
-        # Wait for instance to be ready (5 minutes timeout)
+        # Wait for instance to be ready (10 minutes timeout)
         try:
-            instance = self.client.wait_for_instance(instance_id, timeout=300)  # 5 minutes
+            instance = self.client.wait_for_instance(instance_id, timeout=600)  # 10 minutes
         except RuntimeError as e:
             if "timeout" in str(e).lower():
-                print("\nInstance took too long to start (>5 minutes), destroying and retrying...")
+                print("\nInstance took too long to start (>10 minutes), destroying and retrying...")
                 
                 # Destroy the slow instance
                 try:
@@ -221,12 +221,11 @@ class InstanceManager:
                     max_price=max_price,
                     num_gpus=num_gpus,
                     min_gpu_ram=min_gpu_ram,
-                    min_ram=min_ram,
                     min_disk=min_disk
                 )
                 
                 # Wait again, but this time let it fail if it times out
-                instance = self.client.wait_for_instance(new_instance_id, timeout=300)
+                instance = self.client.wait_for_instance(new_instance_id, timeout=600)
             else:
                 raise
         
