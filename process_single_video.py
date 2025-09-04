@@ -26,6 +26,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
 from infrastructure.vast_ai.transcription_runner import TranscriptionRunner
+from infrastructure.digital_ocean.simple_runner import SimpleDigitalOceanRunner
 from processors.claude_transcript_postprocessor import postprocess_transcript_claude
 from database import get_database, log_video, log_postprocessing
 from downloaders.x_downloader import XDownloader
@@ -105,6 +106,58 @@ def download_youtube(video_id, download_dir):
         raise RuntimeError(f"Failed to download video {video_id}")
     
     return Path(filepath)
+
+
+def trim_audio_on_do(audio_file, start_time, end_time, output_dir):
+    """
+    Trim audio file using Digital Ocean droplet to offload processing
+    
+    Args:
+        audio_file: Path to the audio file
+        start_time: Start time string (e.g., "2:20:00")
+        end_time: End time string (e.g., "2:22:00")
+        output_dir: Directory for trimmed output
+    
+    Returns:
+        Path to trimmed audio file
+    """
+    print(f"\n{'='*60}")
+    print("TRIMMING AUDIO ON DIGITAL OCEAN")
+    print(f"{'='*60}")
+    print(f"Start: {start_time}, End: {end_time}")
+    
+    # Initialize DO runner
+    do_runner = SimpleDigitalOceanRunner()
+    
+    # Upload audio file to DO
+    remote_audio = f"/workspace/audio/{audio_file.name}"
+    print(f"Uploading {audio_file.name} to Digital Ocean...")
+    do_runner.upload_file(str(audio_file), remote_audio)
+    
+    # Prepare output filename
+    trimmed_name = f"trimmed_{audio_file.stem}_{start_time.replace(':', '')}_{end_time.replace(':', '')}{audio_file.suffix}"
+    remote_trimmed = f"/workspace/audio/{trimmed_name}"
+    
+    # Run ffmpeg on DO
+    ffmpeg_cmd = f'ffmpeg -i "{remote_audio}" -ss {start_time} -to {end_time} -c copy "{remote_trimmed}" -y'
+    print(f"Trimming audio on Digital Ocean...")
+    result = do_runner.run_command(ffmpeg_cmd)
+    
+    if "error" in result.lower():
+        raise RuntimeError(f"FFmpeg trim failed: {result}")
+    
+    # Download trimmed file back
+    local_trimmed = output_dir / trimmed_name
+    print(f"Downloading trimmed audio...")
+    do_runner.download_file(remote_trimmed, str(local_trimmed))
+    
+    # Clean up remote files
+    do_runner.run_command(f"rm -f {remote_audio} {remote_trimmed}")
+    
+    print(f"✓ Trimmed audio saved to: {local_trimmed}")
+    print(f"✓ Trimmed duration: {start_time} to {end_time}")
+    
+    return local_trimmed
 
 
 def download_x(tweet_id, download_dir):
@@ -192,6 +245,8 @@ def main():
     parser.add_argument('--x', '--twitter', help='X/Twitter status URL or ID')
     parser.add_argument('--local-transcribe', action='store_true', help='Use local Whisper instead of Vast.ai')
     parser.add_argument('--force', '-f', action='store_true', help='Skip confirmation prompts and force reprocessing')
+    parser.add_argument('--start', help='Start time for trimming (e.g., "2:20:00" or "140:00" or "8400")')
+    parser.add_argument('--end', help='End time for trimming (e.g., "2:22:00" or "142:00" or "8520")')
     
     print("DEBUG: Parsing arguments...", flush=True)
     args = parser.parse_args()
@@ -275,6 +330,21 @@ def main():
             audio_file = download_x(video_id, download_dir)
         
         print(f"✓ Downloaded: {audio_file.name}")
+        
+        # Step 1.5: Trim audio if time range specified
+        if args.start or args.end:
+            if not args.start:
+                args.start = "0:00:00"
+            if not args.end:
+                # If no end specified, we'll need to get duration (or use a large value)
+                args.end = "99:99:99"  # Will be clamped to actual duration by ffmpeg
+            
+            print("\n" + "="*60)
+            print("STEP 1.5: Trimming audio")
+            print("="*60)
+            
+            audio_file = trim_audio_on_do(audio_file, args.start, args.end, download_dir)
+            print(f"✓ Using trimmed audio: {audio_file.name}")
         
         # Step 2: Transcribe
         print("\n" + "="*60)

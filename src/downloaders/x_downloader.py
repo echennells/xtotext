@@ -14,13 +14,13 @@ import logging
 class XDownloader:
     """Download media (video/audio) from X/Twitter posts"""
     
-    def __init__(self, output_dir: str = "data/x_downloads", download_timeout: int = 600):
+    def __init__(self, output_dir: str = "data/x_downloads", download_timeout: int = 3600):
         """
         Initialize X downloader
         
         Args:
             output_dir: Directory to save downloaded media
-            download_timeout: Timeout in seconds for download (default: 600 = 10 minutes)
+            download_timeout: Timeout in seconds for download (default: 3600 = 60 minutes)
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
