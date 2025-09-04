@@ -129,35 +129,41 @@ def trim_audio_on_do(audio_file, start_time, end_time, output_dir):
     # Initialize DO runner
     do_runner = SimpleDigitalOceanRunner()
     
-    # Upload audio file to DO
-    remote_audio = f"/workspace/audio/{audio_file.name}"
-    print(f"Uploading {audio_file.name} to Digital Ocean...")
-    do_runner.upload_file(str(audio_file), remote_audio)
-    
-    # Prepare output filename
-    trimmed_name = f"trimmed_{audio_file.stem}_{start_time.replace(':', '')}_{end_time.replace(':', '')}{audio_file.suffix}"
-    remote_trimmed = f"/workspace/audio/{trimmed_name}"
-    
-    # Run ffmpeg on DO
-    ffmpeg_cmd = f'ffmpeg -i "{remote_audio}" -ss {start_time} -to {end_time} -c copy "{remote_trimmed}" -y'
-    print(f"Trimming audio on Digital Ocean...")
-    result = do_runner.run_command(ffmpeg_cmd)
-    
-    if "error" in result.lower():
-        raise RuntimeError(f"FFmpeg trim failed: {result}")
-    
-    # Download trimmed file back
-    local_trimmed = output_dir / trimmed_name
-    print(f"Downloading trimmed audio...")
-    do_runner.download_file(remote_trimmed, str(local_trimmed))
-    
-    # Clean up remote files
-    do_runner.run_command(f"rm -f {remote_audio} {remote_trimmed}")
-    
-    print(f"✓ Trimmed audio saved to: {local_trimmed}")
-    print(f"✓ Trimmed duration: {start_time} to {end_time}")
-    
-    return local_trimmed
+    try:
+        # Upload audio file to DO
+        remote_audio = f"/workspace/audio/{audio_file.name}"
+        print(f"Uploading {audio_file.name} to Digital Ocean...")
+        do_runner.upload_file(str(audio_file), remote_audio)
+        
+        # Prepare output filename
+        trimmed_name = f"trimmed_{audio_file.stem}_{start_time.replace(':', '')}_{end_time.replace(':', '')}{audio_file.suffix}"
+        remote_trimmed = f"/workspace/audio/{trimmed_name}"
+        
+        # Run ffmpeg on DO
+        ffmpeg_cmd = f'ffmpeg -i "{remote_audio}" -ss {start_time} -to {end_time} -c copy "{remote_trimmed}" -y'
+        print(f"Trimming audio on Digital Ocean...")
+        result = do_runner.run_command(ffmpeg_cmd)
+        
+        if "error" in result.lower():
+            raise RuntimeError(f"FFmpeg trim failed: {result}")
+        
+        # Download trimmed file back
+        local_trimmed = output_dir / trimmed_name
+        print(f"Downloading trimmed audio...")
+        do_runner.download_file(remote_trimmed, str(local_trimmed))
+        
+        # Clean up remote files
+        do_runner.run_command(f"rm -f {remote_audio} {remote_trimmed}")
+        
+        print(f"✓ Trimmed audio saved to: {local_trimmed}")
+        print(f"✓ Trimmed duration: {start_time} to {end_time}")
+        
+        return local_trimmed
+        
+    finally:
+        # ALWAYS clean up the DO droplet
+        print("Cleaning up Digital Ocean droplet...")
+        do_runner.cleanup(destroy_droplet=True)
 
 
 def download_x(tweet_id, download_dir):
