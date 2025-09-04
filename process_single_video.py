@@ -108,14 +108,53 @@ def download_youtube(video_id, download_dir):
     return Path(filepath)
 
 
+def parse_time_to_seconds(time_str):
+    """
+    Parse time string to seconds. Supports multiple formats:
+    - "2:20:30" -> 2 hours, 20 minutes, 30 seconds
+    - "2:20" -> 2 hours, 20 minutes
+    - "140:30" -> 140 minutes, 30 seconds  
+    - "8400" -> 8400 seconds
+    """
+    if ':' not in time_str:
+        # Just seconds
+        return int(time_str)
+    
+    parts = time_str.split(':')
+    if len(parts) == 2:
+        # Could be HH:MM or MM:SS - assume HH:MM for values > 59 in first part
+        first, second = map(int, parts)
+        if first > 59:
+            # Definitely minutes:seconds (e.g., 140:30)
+            return first * 60 + second
+        else:
+            # Assume hours:minutes (e.g., 2:20)
+            return first * 3600 + second * 60
+    elif len(parts) == 3:
+        # HH:MM:SS
+        hours, minutes, seconds = map(int, parts)
+        return hours * 3600 + minutes * 60 + seconds
+    else:
+        raise ValueError(f"Invalid time format: {time_str}")
+
+
+def format_time_for_ffmpeg(time_str):
+    """Convert any time format to FFmpeg's expected HH:MM:SS format"""
+    seconds = parse_time_to_seconds(time_str)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
 def trim_audio_on_do(audio_file, start_time, end_time, output_dir):
     """
     Trim audio file using Digital Ocean droplet to offload processing
     
     Args:
         audio_file: Path to the audio file
-        start_time: Start time string (e.g., "2:20:00")
-        end_time: End time string (e.g., "2:22:00")
+        start_time: Start time string (e.g., "2:20:00", "2:20", "140:30", "8400")
+        end_time: End time string (e.g., "2:22:00", "2:22", "142:00", "8520")
         output_dir: Directory for trimmed output
     
     Returns:
@@ -124,7 +163,13 @@ def trim_audio_on_do(audio_file, start_time, end_time, output_dir):
     print(f"\n{'='*60}")
     print("TRIMMING AUDIO ON DIGITAL OCEAN")
     print(f"{'='*60}")
-    print(f"Start: {start_time}, End: {end_time}")
+    
+    # Format times for ffmpeg (HH:MM:SS)
+    ffmpeg_start = format_time_for_ffmpeg(start_time)
+    ffmpeg_end = format_time_for_ffmpeg(end_time)
+    
+    print(f"Input times: {start_time} to {end_time}")
+    print(f"FFmpeg format: {ffmpeg_start} to {ffmpeg_end}")
     
     # Initialize DO runner
     do_runner = SimpleDigitalOceanRunner()
@@ -135,12 +180,12 @@ def trim_audio_on_do(audio_file, start_time, end_time, output_dir):
         print(f"Uploading {audio_file.name} to Digital Ocean...")
         do_runner.upload_file(str(audio_file), remote_audio)
         
-        # Prepare output filename
+        # Prepare output filename (use original time strings for filename)
         trimmed_name = f"trimmed_{audio_file.stem}_{start_time.replace(':', '')}_{end_time.replace(':', '')}{audio_file.suffix}"
         remote_trimmed = f"/workspace/audio/{trimmed_name}"
         
-        # Run ffmpeg on DO
-        ffmpeg_cmd = f'ffmpeg -i "{remote_audio}" -ss {start_time} -to {end_time} -c copy "{remote_trimmed}" -y'
+        # Run ffmpeg on DO (use formatted times)
+        ffmpeg_cmd = f'ffmpeg -i "{remote_audio}" -ss {ffmpeg_start} -to {ffmpeg_end} -c copy "{remote_trimmed}" -y'
         print(f"Trimming audio on Digital Ocean...")
         result = do_runner.run_command(ffmpeg_cmd)
         
@@ -251,8 +296,8 @@ def main():
     parser.add_argument('--x', '--twitter', help='X/Twitter status URL or ID')
     parser.add_argument('--local-transcribe', action='store_true', help='Use local Whisper instead of Vast.ai')
     parser.add_argument('--force', '-f', action='store_true', help='Skip confirmation prompts and force reprocessing')
-    parser.add_argument('--start', help='Start time for trimming (e.g., "2:20:00" or "140:00" or "8400")')
-    parser.add_argument('--end', help='End time for trimming (e.g., "2:22:00" or "142:00" or "8520")')
+    parser.add_argument('--start', help='Start time for trimming (e.g., "2:20" for 2h20m, "2:20:30" for 2h20m30s, "140:30" for 140m30s, "8400" for seconds)')
+    parser.add_argument('--end', help='End time for trimming (same formats as --start)')
     
     print("DEBUG: Parsing arguments...", flush=True)
     args = parser.parse_args()
