@@ -110,41 +110,22 @@ def download_youtube(video_id, download_dir):
 
 def parse_time_to_seconds(time_str):
     """
-    Parse time string to seconds. Supports multiple formats:
-    - "2:20:30" -> 2 hours, 20 minutes, 30 seconds
+    Parse time string to seconds. Format: HH:MM
     - "2:20" -> 2 hours, 20 minutes
-    - "140:30" -> 140 minutes, 30 seconds  
-    - "8400" -> 8400 seconds
+    - "13:45" -> 13 hours, 45 minutes
     """
-    if ':' not in time_str:
-        # Just seconds
-        return int(time_str)
-    
     parts = time_str.split(':')
-    if len(parts) == 2:
-        # Could be HH:MM or MM:SS - assume HH:MM for values > 59 in first part
-        first, second = map(int, parts)
-        if first > 59:
-            # Definitely minutes:seconds (e.g., 140:30)
-            return first * 60 + second
-        else:
-            # Assume hours:minutes (e.g., 2:20)
-            return first * 3600 + second * 60
-    elif len(parts) == 3:
-        # HH:MM:SS
-        hours, minutes, seconds = map(int, parts)
-        return hours * 3600 + minutes * 60 + seconds
-    else:
-        raise ValueError(f"Invalid time format: {time_str}")
+    if len(parts) != 2:
+        raise ValueError(f"Time must be in HH:MM format, got: {time_str}")
+    
+    hours, minutes = map(int, parts)
+    return hours * 3600 + minutes * 60
 
 
 def format_time_for_ffmpeg(time_str):
-    """Convert any time format to FFmpeg's expected HH:MM:SS format"""
-    seconds = parse_time_to_seconds(time_str)
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    """Convert HH:MM format to FFmpeg's expected HH:MM:SS format"""
+    # Simply append :00 for seconds
+    return f"{time_str}:00"
 
 
 def trim_audio_on_do(audio_file, start_time, end_time, output_dir):
@@ -153,8 +134,8 @@ def trim_audio_on_do(audio_file, start_time, end_time, output_dir):
     
     Args:
         audio_file: Path to the audio file
-        start_time: Start time string (e.g., "2:20:00", "2:20", "140:30", "8400")
-        end_time: End time string (e.g., "2:22:00", "2:22", "142:00", "8520")
+        start_time: Start time in HH:MM format (e.g., "2:20" for 2 hours 20 minutes)
+        end_time: End time in HH:MM format (e.g., "2:22" for 2 hours 22 minutes)
         output_dir: Directory for trimmed output
     
     Returns:
@@ -296,8 +277,8 @@ def main():
     parser.add_argument('--x', '--twitter', help='X/Twitter status URL or ID')
     parser.add_argument('--local-transcribe', action='store_true', help='Use local Whisper instead of Vast.ai')
     parser.add_argument('--force', '-f', action='store_true', help='Skip confirmation prompts and force reprocessing')
-    parser.add_argument('--start', help='Start time for trimming (e.g., "2:20" for 2h20m, "2:20:30" for 2h20m30s, "140:30" for 140m30s, "8400" for seconds)')
-    parser.add_argument('--end', help='End time for trimming (same formats as --start)')
+    parser.add_argument('--start', help='Start time in HH:MM format (e.g., "2:20" for 2 hours 20 minutes)')
+    parser.add_argument('--end', help='End time in HH:MM format (e.g., "2:22" for 2 hours 22 minutes)')
     
     print("DEBUG: Parsing arguments...", flush=True)
     args = parser.parse_args()
