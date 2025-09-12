@@ -27,6 +27,7 @@ sys.path.insert(0, str(project_root / "src"))
 
 from infrastructure.vast_ai.transcription_runner import TranscriptionRunner
 from infrastructure.digital_ocean.simple_runner import SimpleDigitalOceanRunner
+from infrastructure.local_whisper.runner import LocalWhisperRunner
 from processors.claude_transcript_postprocessor import postprocess_transcript_claude
 from database import get_database, log_video, log_postprocessing
 from downloaders.x_downloader import XDownloader
@@ -310,7 +311,7 @@ def main():
     parser.add_argument('url', nargs='?', help='Video URL (YouTube or X/Twitter)')
     parser.add_argument('--youtube', help='YouTube video URL or ID')
     parser.add_argument('--x', '--twitter', help='X/Twitter status URL or ID')
-    parser.add_argument('--local-transcribe', action='store_true', help='Use local Whisper instead of Vast.ai')
+    parser.add_argument('--local-transcribe', action='store_true', help='Use local Whisper Docker container instead of Vast.ai')
     parser.add_argument('--force', '-f', action='store_true', help='Skip confirmation prompts and force reprocessing')
     parser.add_argument('--start', help='Start time in HH:MM format (e.g., "2:20" for 2 hours 20 minutes)')
     parser.add_argument('--end', help='End time in HH:MM format (e.g., "2:22" for 2 hours 22 minutes)')
@@ -444,14 +445,21 @@ def main():
             print(f"Transcript already exists: {transcript_file}")
         else:
             if args.local_transcribe:
-                # Use local Whisper
-                print("Using local Whisper model...")
-                import whisper
-                model = whisper.load_model("base")
-                result = model.transcribe(str(audio_file))
+                # Use local Whisper Docker container
+                print("Using local Whisper Docker container...")
+                runner = LocalWhisperRunner(model="base")
                 
-                with open(transcript_file, 'w') as f:
-                    json.dump(result, f, indent=2)
+                # Setup Docker if needed
+                if not runner.setup():
+                    logger.error("Failed to setup Docker environment")
+                    sys.exit(1)
+                
+                # Transcribe the audio
+                result = runner.transcribe_file(
+                    str(audio_file),
+                    output_path=str(transcript_file),
+                    output_format="json"
+                )
                 
                 print(f"✓ Transcript saved to: {transcript_file}")
             else:
