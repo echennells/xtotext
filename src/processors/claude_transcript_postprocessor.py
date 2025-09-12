@@ -133,7 +133,8 @@ OUTPUT: Return ONLY the corrected transcript."""
             response = requests.post(
                 f"{self.api_base}/chat/completions",
                 headers=headers,
-                json=data
+                json=data,
+                timeout=30  # Add 30 second timeout
             )
             response.raise_for_status()
             result = response.json()

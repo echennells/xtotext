@@ -31,6 +31,7 @@ from processors.claude_transcript_postprocessor import postprocess_transcript_cl
 from database import get_database, log_video, log_postprocessing
 from downloaders.x_downloader import XDownloader
 from downloaders.youtube_channel_downloader import YouTubeChannelDownloader
+from extractors.youtube_segment_extractor import YouTubeSegmentExtractor
 from utils.filename_utils import sanitize_filename
 import subprocess
 
@@ -86,40 +87,74 @@ def extract_video_info(url):
     return None, None, None
 
 
-def download_youtube(video_id, download_dir):
-    """Download YouTube video audio using YouTubeChannelDownloader"""
-    print(f"Downloading YouTube video: {video_id}")
+def download_youtube(video_id, download_dir, start_time=None, end_time=None):
+    """
+    Download YouTube video audio, optionally extracting a specific time range.
     
-    # Check if we already have the audio file
-    existing_files = list(Path("data").rglob(f"*{video_id}*.mp3"))
-    if existing_files:
-        print(f"✓ Found existing audio file: {existing_files[0]}")
-        return existing_files[0]
+    Args:
+        video_id: YouTube video ID
+        download_dir: Directory to save the download
+        start_time: Start time in HH:MM format (optional)
+        end_time: End time in HH:MM format (optional)
     
-    # Use YouTubeChannelDownloader for consistency with main.py
-    downloader = YouTubeChannelDownloader(str(download_dir))
+    Returns:
+        Path to the downloaded/extracted audio file
+    """
+    print(f"DEBUG: Entered download_youtube function", flush=True)
+    print(f"Downloading YouTube video: {video_id}", flush=True)
     
-    # Use the new public method
-    success, filepath = downloader.download_single_video_by_id(video_id)
+    # If time range specified, use the segment extractor
+    if start_time and end_time:
+        extractor = YouTubeSegmentExtractor(
+            cache_dir="data/youtube_cache",
+            output_dir=str(download_dir)
+        )
+        
+        # Extract segment with metadata saving
+        # Keep cache for future use (could be made configurable)
+        success, audio_path, metadata = extractor.extract_segment(
+            video_id=video_id,
+            start_time=start_time,
+            end_time=end_time,
+            keep_full_audio=True  # Keep cached for multiple segments
+        )
+        
+        if not success:
+            raise RuntimeError(f"Failed to extract segment from video {video_id}")
+        
+        # Log the metadata info
+        print(f"✓ YouTube link saved: {metadata['youtube_timestamp_link']}")
+        print(f"✓ Metadata saved with segment info")
+        
+        return audio_path
     
-    if not success or not filepath:
-        raise RuntimeError(f"Failed to download video {video_id}")
-    
-    return Path(filepath)
+    # For full video downloads, use existing method
+    else:
+        # Check if we already have the audio file in cache
+        print(f"DEBUG: Checking for existing audio files", flush=True)
+        cache_dir = Path("data/youtube_cache")
+        existing_files = list(cache_dir.glob(f"*{video_id}*.mp3")) if cache_dir.exists() else []
+        print(f"DEBUG: Found {len(existing_files)} existing files", flush=True)
+        if existing_files:
+            print(f"✓ Found existing audio file: {existing_files[0]}", flush=True)
+            return existing_files[0]
+        
+        # Use the segment extractor without time range (downloads full audio)
+        extractor = YouTubeSegmentExtractor(
+            cache_dir="data/youtube_cache",
+            output_dir=str(download_dir)
+        )
+        
+        # Download full audio
+        success, audio_path = extractor.download_full_audio(video_id, keep_cache=True)
+        
+        if not success:
+            raise RuntimeError(f"Failed to download video {video_id}")
+        
+        return audio_path
 
 
-def parse_time_to_seconds(time_str):
-    """
-    Parse time string to seconds. Format: HH:MM
-    - "2:20" -> 2 hours, 20 minutes
-    - "13:45" -> 13 hours, 45 minutes
-    """
-    parts = time_str.split(':')
-    if len(parts) != 2:
-        raise ValueError(f"Time must be in HH:MM format, got: {time_str}")
-    
-    hours, minutes = map(int, parts)
-    return hours * 3600 + minutes * 60
+# parse_time_to_seconds removed - now using YouTubeSegmentExtractor module
 
 
 def format_time_for_ffmpeg(time_str):
@@ -309,13 +344,16 @@ def main():
         print(f"Error: Could not determine platform from URL: {url}")
         sys.exit(1)
     
-    print("="*60)
-    print(f"Processing {platform.upper()} Video")
-    print("="*60)
-    print(f"Video ID: {video_id}")
-    print(f"Full URL: {full_url}")
+    print("DEBUG: About to print separator", flush=True)
+    print("="*60, flush=True)
+    print(f"Processing {platform.upper()} Video", flush=True)
+    print("="*60, flush=True)
+    print(f"Video ID: {video_id}", flush=True)
+    print(f"Full URL: {full_url}", flush=True)
+    print("DEBUG: Finished printing video info", flush=True)
     
     # Set up directories
+    print("DEBUG: Setting up directories", flush=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     if platform == 'youtube':
@@ -325,6 +363,7 @@ def main():
         download_dir = Path(f"data/x_downloads/{timestamp}")
         output_dir = Path("data/x_analysis")
     
+    print("DEBUG: Creating directories", flush=True)
     download_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -332,11 +371,15 @@ def main():
     transcripts_dir.mkdir(exist_ok=True)
     
     # Initialize database
+    print("DEBUG: Initializing database", flush=True)
     db = get_database()
+    print("DEBUG: Database initialized", flush=True)
     
     # Check if already processed
     db_video_id = f"{platform}_{video_id}"
+    print(f"DEBUG: Checking database for {db_video_id}", flush=True)
     db_entry = db.get_video(db_video_id)
+    print(f"DEBUG: Database check complete, found: {db_entry is not None}", flush=True)
     
     if db_entry:
         print(f"\n✓ Video already in database: {db_entry.get('title', video_id)}")
@@ -350,21 +393,31 @@ def main():
         else:
             print("  Force flag set - reprocessing...")
     
+    print("DEBUG: About to enter try block", flush=True)
     try:
         # Step 1: Download audio
-        print("\n" + "="*60)
-        print("STEP 1: Downloading audio")
-        print("="*60)
+        print("\n" + "="*60, flush=True)
+        print("STEP 1: Downloading audio", flush=True)
+        print("="*60, flush=True)
         
         if platform == 'youtube':
-            audio_file = download_youtube(video_id, download_dir)
+            # For YouTube, pass time range to download function if specified
+            print(f"DEBUG: Calling download_youtube for {video_id}", flush=True)
+            if args.start and args.end:
+                audio_file = download_youtube(video_id, download_dir, args.start, args.end)
+                # Skip DO trimming since we already have the segment
+                skip_trimming = True
+            else:
+                audio_file = download_youtube(video_id, download_dir)
+                skip_trimming = False
         else:
             audio_file = download_x(video_id, download_dir)
+            skip_trimming = False
         
         print(f"✓ Downloaded: {audio_file.name}")
         
-        # Step 1.5: Trim audio if time range specified
-        if args.start or args.end:
+        # Step 1.5: Trim audio if time range specified (skip for YouTube if already segmented)
+        if (args.start or args.end) and not skip_trimming:
             if not args.start:
                 args.start = "0:00:00"
             if not args.end:

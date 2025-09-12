@@ -1,0 +1,16 @@
+{
+  "phase1_extracts": [],
+  "phase2_synthesis": "No relevant content found for specified topics",
+  "topics_analyzed": [
+    "garbled circuit",
+    "snark verifier",
+    "bitvm bridge",
+    "operator challenge",
+    "groth16",
+    "covenant",
+    "taproot"
+  ],
+  "transcripts_processed": 8,
+  "model_used": "anthropic/claude-3-sonnet",
+  "total_cost": 0.0
+}

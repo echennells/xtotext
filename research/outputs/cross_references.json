@@ -1,0 +1,124 @@
+{
+  "kind": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_022-058_transcript.json",
+      "transcript_index": 0,
+      "pattern": "(?:similar to|like) what (\\w+)",
+      "context": "...he rough concept how it works is we have operators that operate the bridge, and they process withdrawals when people want to withdraw money from the bridge. And if they are malicious, if they do some kind of funny business, if they want to withdraw money that they should not withdraw, then challengers can slash them. That's roughly the mechanism behind optimistic verification. And the security assumpt..."
+    }
+  ],
+  "robin": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_107-143_transcript.json",
+      "transcript_index": 1,
+      "pattern": "as (\\w+) (?:mentioned|said|discussed|showed)",
+      "context": "...e types of applications. Then we will move into some of the innovations that we did, yep, let's start. So what is BitVMX? Well, first of all, I think, obviously, we saw the previous presentation from Robin. Two years ago, he presented BitVM in that way, opened the door for a new type of smart contract on Bitcoin using the speed toggle computation. This actually was possible, even without changing conse..."
+    },
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_107-144_transcript.json",
+      "transcript_index": 2,
+      "pattern": "as (\\w+) (?:mentioned|said|discussed|showed)",
+      "context": "...se type of applications. Then we will move into some of the innovations that we did. Yep, let's start. So what is BitVMX? Well, first of all, I think, obviously, we saw the previous presentation from Robin. Two years ago, he presented BitVM in that way opened the door for a new type of smart contract on Bitcoin using this off-chain computation. This actually was possible, even without changing consensu..."
+    },
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_312-356_transcript.json",
+      "transcript_index": 5,
+      "pattern": "as (\\w+) (?:mentioned|said|discussed|showed)",
+      "context": "...the time. Maybe with BitVM3 can get rid of all these trust assumptions. No. The answer is no, okay? Even with BitVM3 you get exactly the same set of trust assumption actually. So if you remember what Robin said in the first talk of the afternoon, Robin said that in the bridge there are two parts, okay? One is there is the protocol which is run by a set of pre-signed transactions, okay? And two is there..."
+    }
+  ],
+  "nobody": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_312-356_transcript.json",
+      "transcript_index": 5,
+      "pattern": "(\\w+)'s (?:talk|presentation|work|research)",
+      "context": "...bridge. So anyway, so you may say, hey, these trust assumptions, maybe it's because we're using BitVM2 and not BitVM3. Hey, come on, David, catch up to the time. Everyone is now talking about BitVM3, nobody's talking about BitVM2 anymore, you're behind the time. Maybe with BitVM3 can get rid of all these trust assumptions. No. The answer is no, okay? Even with BitVM3 you get exactly the same set of trus..."
+    }
+  ],
+  "been": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_440-538_transcript.json",
+      "transcript_index": 6,
+      "pattern": "as (\\w+) (?:mentioned|said|discussed|showed)",
+      "context": "...\u7bb8\u6ac3\u9280\u884c, bitcoin, Kum broadband, stablecoin, blockchain, etc. Welcome back to the main stage at Bitcoin++ scaling edition. My name is Walton, I've been MCing today, but I'm delighted to be able to moderate another panel here at Bitcoin Plus Plus. Thank you. Thank you, super. The ark, of course, was boarded two by two, and that's exactly how I'm goin..."
+    }
+  ],
+  "who": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_440-538_transcript.json",
+      "transcript_index": 6,
+      "pattern": "(\\w+)'s (?:talk|presentation|work|research)",
+      "context": "...and that's exactly how I'm going to do my speakers. So to begin, the two gentlemen from the two ARK teams, Steve Maruz from Second and Alex B from ARK Labs. And the next two of my favorite developers who I think are deeply passionate about self-custody and enabling more freedoms for people to transact on Bitcoin, how they want to, the one the only super-testnet. And one of the pioneers of mini-script..."
+    }
+  ],
+  "ark": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_440-538_transcript.json",
+      "transcript_index": 6,
+      "pattern": "(?:similar to|like) what (\\w+)",
+      "context": "...e main stage at Bitcoin++ scaling edition. My name is Walton, I've been MCing today, but I'm delighted to be able to moderate another panel here at Bitcoin Plus Plus. Thank you. Thank you, super. The ark, of course, was boarded two by two, and that's exactly how I'm going to do my speakers. So to begin, the two gentlemen from the two ARK teams, Steve Maruz from Second and Alex B from ARK Labs. And th..."
+    }
+  ],
+  "are": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_440-538_transcript.json",
+      "transcript_index": 6,
+      "pattern": "(?:similar to|like) what (\\w+)",
+      "context": "...xactly how I'm going to do my speakers. So to begin, the two gentlemen from the two ARK teams, Steve Maruz from Second and Alex B from ARK Labs. And the next two of my favorite developers who I think are deeply passionate about self-custody and enabling more freedoms for people to transact on Bitcoin, how they want to, the one the only super-testnet. And one of the pioneers of mini-script, Salvatore ..."
+    },
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_543-629_transcript.json",
+      "transcript_index": 7,
+      "pattern": "(?:similar to|like) what (\\w+)",
+      "context": "...about, we're going to keep this shorter, about 40 minutes of chatting. Thanks. Maybe I can talk louder. I'll try. Yeah, so I'm really excited to have three really incredible intelligent builders that are working on zero-knowledge related projects to scale Bitcoin. I have here with me Misha from, let me get this wrong, oh I can it. Okay, thank you. Liam Egan from Alpen Labs and Abdel from Starkware. S..."
+    }
+  ],
+  "you": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_543-629_transcript.json",
+      "transcript_index": 7,
+      "pattern": "as (\\w+) (?:mentioned|said|discussed|showed)",
+      "context": "...have three really incredible intelligent builders that are working on zero-knowledge related projects to scale Bitcoin. I have here with me Misha from, let me get this wrong, oh I can it. Okay, thank you. Liam Egan from Alpen Labs and Abdel from Starkware. So hello everyone, welcome to Bitcoin Plus Plus scaling edition. Cool, so I think really awesome for the audience maybe if we go through, you know..."
+    }
+  ],
+  "liam": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_543-629_transcript.json",
+      "transcript_index": 7,
+      "pattern": "as (\\w+) (?:mentioned|said|discussed|showed)",
+      "context": "...three really incredible intelligent builders that are working on zero-knowledge related projects to scale Bitcoin. I have here with me Misha from, let me get this wrong, oh I can it. Okay, thank you. Liam Egan from Alpen Labs and Abdel from Starkware. So hello everyone, welcome to Bitcoin Plus Plus scaling edition. Cool, so I think really awesome for the audience maybe if we go through, you know, just..."
+    }
+  ],
+  "yam": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_543-629_transcript.json",
+      "transcript_index": 7,
+      "pattern": "as (\\w+) (?:mentioned|said|discussed|showed)",
+      "context": "...stless and to fully inherit the properties of the layer one, you have to do that. Only then you can verify that the state root is correct and that the changes are valid according to the proof. But as YAM said, you can have some hybrid model where you do like Validium, where you submit those data elsewhere, so it's off-chain, but you have a bit less security because you don't fully inherit from the se..."
+    }
+  ],
+  "does": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_543-629_transcript.json",
+      "transcript_index": 7,
+      "pattern": "(?:similar to|like) what (\\w+)",
+      "context": "...any in Misha's case are building? So you guys are building rollups or like side chains, sort of thing for Bitcoin. How is zero-knowledge proof systems that all of you guys have experienced? And where does that come and play in the scaling question? Yeah, so like with a layer two, you kind of could imagine it is like a kind of parallel blockchain with maybe different execution semantics or faster block..."
+    }
+  ],
+  "they": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_543-629_transcript.json",
+      "transcript_index": 7,
+      "pattern": "(?:similar to|like) what (\\w+)",
+      "context": "...ther it's like if it's some special purpose witness encryption or like special purpose functional encryption thing it's though all of those are very very limited and you know on the border line of if they're feasible or practical but with proper compression and like with proper you know tricks and caveats here and there whatever the bet is that we could make it work and that would effectively allow no..."
+    }
+  ],
+  "takes": [
+    {
+      "transcript": "bitcoin_Istanbul_Scaling_Bitcoin_Live_Day_1_gWWxDd3mhZc_543-629_transcript.json",
+      "transcript_index": 7,
+      "pattern": "(?:similar to|like) what (\\w+)",
+      "context": "...d the to Liam, but like we did not So it's I mean, let's just be honest about this. Okay We are actually working on security proofs. That's that's what it is it's like security proofs, it's like what takes us, like the last like several last months or something. And you say, I just wanted to emphasize that putting SNARKs on Bitcoin is not like, I mean, it would require putting like a small amount of da..."
+    }
+  ]
+}

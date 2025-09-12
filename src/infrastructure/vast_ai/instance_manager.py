@@ -58,7 +58,7 @@ class InstanceManager:
         """
         if exclude_countries is None:
             # Exclude countries where connections are problematic
-            exclude_countries = ['CN', 'BG', 'RO']  # China, Bulgaria, Romania
+            exclude_countries = ['CN', 'BG', 'RO', 'RU', 'ZA', 'UA']  # China, Bulgaria, Romania, Russia, South Africa, Ukraine
             
         print(f"Searching for {gpu_type} instances...")
         
