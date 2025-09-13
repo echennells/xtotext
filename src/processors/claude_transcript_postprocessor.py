@@ -36,6 +36,12 @@ class ClaudeTranscriptPostProcessor:
         # If not in env, try to load from config
         if not self.api_key:
             try:
+                import sys
+                from pathlib import Path
+                # Add project root to path to find config
+                project_root = Path(__file__).parent.parent.parent
+                if str(project_root) not in sys.path:
+                    sys.path.insert(0, str(project_root))
                 from config.config import OPENROUTER_API_KEY
                 self.api_key = OPENROUTER_API_KEY
             except ImportError:
