@@ -1,0 +1,26 @@
+# Core dependencies
+python-dotenv>=1.0.0
+requests>=2.31.0
+urllib3>=2.0.0
+
+# OpenAI and LLM clients
+openai>=1.0.0
+tiktoken>=0.5.0
+
+# Video/Audio processing
+yt-dlp>=2023.12.30
+openai-whisper>=20230918  # For local whisper transcription
+pydub>=0.25.1
+ffmpeg-python>=0.2.0
+
+# Cloud infrastructure
+paramiko>=3.0.0  # For SSH connections
+digitalocean>=1.17.0  # Digital Ocean API client
+
+# Data processing
+ijson>=3.2.0  # For streaming JSON parsing
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Standard library extensions
+python-dateutil>=2.8.2

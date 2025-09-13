@@ -235,6 +235,7 @@ cache.db
 *_transcripts/
 *.transcript
 *.txt
+!requirements.txt
 *.srt
 *.vtt
 episode*_chunk*.txt
