@@ -44,8 +44,16 @@ class ClaudeTranscriptPostProcessor:
                     sys.path.insert(0, str(project_root))
                 from config.config import OPENROUTER_API_KEY
                 self.api_key = OPENROUTER_API_KEY
-            except ImportError:
+            except ImportError as e:
+                print(f"DEBUG: Failed to import config: {e}")
                 pass
+            except Exception as e:
+                print(f"DEBUG: Unexpected error loading config: {e}")
+                pass
+        
+        # Debug output
+        print(f"DEBUG: OPENROUTER_API_KEY from env: {os.getenv('OPENROUTER_API_KEY')[:20] + '...' if os.getenv('OPENROUTER_API_KEY') else 'None'}")
+        print(f"DEBUG: self.api_key: {self.api_key[:20] + '...' if self.api_key else 'None'}")
         
         if not self.api_key:
             raise ValueError("OpenRouter API key required. Set OPENROUTER_API_KEY env var or add to config/config.py")
