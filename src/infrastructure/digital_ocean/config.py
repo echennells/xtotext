@@ -13,7 +13,7 @@ if not DIGITAL_OCEAN_API_KEY:
         sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
         from config.config import DIGITAL_OCEAN_API_KEY as CONFIG_DO_KEY
         DIGITAL_OCEAN_API_KEY = CONFIG_DO_KEY
-    except:
+    except ImportError:
         pass
 
 DIGITAL_OCEAN_API_BASE = "https://api.digitalocean.com/v2"
@@ -80,4 +80,11 @@ JOB_CHECK_INTERVAL = 10  # seconds
 # Control Tower Configuration
 CONTROL_TOWER_PORT = 8080
 CONTROL_TOWER_HOST = "0.0.0.0"
-API_SECRET_KEY = os.getenv("CONTROL_TOWER_SECRET", "change-me-in-production")
+
+# Fail-secure: require secret to be set explicitly
+API_SECRET_KEY = os.getenv("CONTROL_TOWER_SECRET")
+if not API_SECRET_KEY:
+    raise ValueError(
+        "CONTROL_TOWER_SECRET environment variable is required for Control Tower API authentication. "
+        "Set it in your .env file."
+    )

@@ -62,9 +62,18 @@ class XDownloader:
         # Match patterns like:
         # https://x.com/username/status/1234567890
         # https://twitter.com/username/status/1234567890
-        pattern = r'(?:x\.com|twitter\.com)/\w+/status/(\d+)'
-        match = re.search(pattern, url)
-        return match.group(1) if match else None
+        # https://x.com/i/spaces/1vAxRQlrZwZJl
+        # https://x.com/i/broadcasts/1ynKOMegyMnJR
+        patterns = [
+            r'(?:x\.com|twitter\.com)/\w+/status/(\d+)',
+            r'(?:x\.com|twitter\.com)/i/spaces/([a-zA-Z0-9]+)',
+            r'(?:x\.com|twitter\.com)/i/broadcasts/([a-zA-Z0-9]+)'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
+        return None
     
     def _get_post_metadata(self, url: str) -> Dict:
         """Get metadata about the X post"""

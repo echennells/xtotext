@@ -9,7 +9,7 @@ import requests
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 import tiktoken
-from utils.filename_utils import sanitize_filename
+from src.utils.filename_utils import sanitize_filename
 
 
 class ClaudeTranscriptPostProcessor:
@@ -50,10 +50,6 @@ class ClaudeTranscriptPostProcessor:
             except Exception as e:
                 print(f"DEBUG: Unexpected error loading config: {e}")
                 pass
-        
-        # Debug output
-        print(f"DEBUG: OPENROUTER_API_KEY from env: {os.getenv('OPENROUTER_API_KEY')[:20] + '...' if os.getenv('OPENROUTER_API_KEY') else 'None'}")
-        print(f"DEBUG: self.api_key: {self.api_key[:20] + '...' if self.api_key else 'None'}")
         
         if not self.api_key:
             raise ValueError("OpenRouter API key required. Set OPENROUTER_API_KEY env var or add to config/config.py")
@@ -166,12 +162,19 @@ OUTPUT: Return ONLY the corrected transcript."""
     def process_transcript(self, transcript: Dict[str, Any]) -> Dict[str, Any]:
         """Process a full transcript"""
         print("Post-processing transcript with Claude 3 Haiku...")
-        
-        # Extract full text
-        if 'text' in transcript:
-            full_text = transcript['text']
+
+        # Handle nested transcript structure (from segment_transcriber)
+        # The .transcript.json files have structure: {"segment_info": {...}, "transcript": {"text": ...}}
+        if 'transcript' in transcript and isinstance(transcript['transcript'], dict):
+            transcript_data = transcript['transcript']
         else:
-            full_text = ' '.join(seg.get('text', '') for seg in transcript.get('segments', []))
+            transcript_data = transcript
+
+        # Extract full text
+        if 'text' in transcript_data:
+            full_text = transcript_data['text']
+        else:
+            full_text = ' '.join(seg.get('text', '') for seg in transcript_data.get('segments', []))
         
         # Split into chunks
         chunks = self.split_into_chunks(full_text)
@@ -217,11 +220,17 @@ OUTPUT: Return ONLY the corrected transcript."""
         # Load transcript
         with open(input_path, 'r') as f:
             transcript = json.load(f)
-        
+
+        # Handle nested transcript structure (from segment_transcriber)
+        if 'transcript' in transcript and isinstance(transcript['transcript'], dict):
+            transcript_data = transcript['transcript']
+        else:
+            transcript_data = transcript
+
         # Extract original text
-        original_text = transcript.get('text', '')
-        if not original_text and 'segments' in transcript:
-            original_text = ' '.join(seg.get('text', '') for seg in transcript['segments'])
+        original_text = transcript_data.get('text', '')
+        if not original_text and 'segments' in transcript_data:
+            original_text = ' '.join(seg.get('text', '') for seg in transcript_data['segments'])
         
         # Process
         corrected = self.process_transcript(transcript)

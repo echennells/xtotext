@@ -110,7 +110,20 @@ class YouTubeSegmentExtractor:
         # Download audio
         output_path = self.cache_dir / f"{title}_{video_id}.mp3"
         
-        download_cmd = [
+        # Try downloading with different strategies
+        # Default (no extractor args) works best for ended live stream VODs;
+        # the android/web client args can trigger "This live event has ended" for VODs.
+        strategies = [
+            [],  # Default - let yt-dlp decide
+            ["--extractor-args", "youtube:player_client=ios,tv_embedded"],
+            ["--extractor-args", "youtube:player_client=android,web"],
+        ]
+
+        logger.info(f"Downloading audio from {url}...")
+        start_time = datetime.now()
+        result = None
+
+        base_cmd = [
             "yt-dlp",
             url,
             "-x",  # Extract audio
@@ -118,15 +131,21 @@ class YouTubeSegmentExtractor:
             "--audio-quality", "0",  # Best quality
             "-o", str(output_path.with_suffix('.%(ext)s')),
             "--quiet",
-            "--no-warnings"
+            "--no-warnings",
         ]
-        
-        logger.info(f"Downloading audio from {url}...")
-        start_time = datetime.now()
-        result = subprocess.run(download_cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            logger.error(f"Download failed: {result.stderr}")
+
+        for extra_args in strategies:
+            download_cmd = base_cmd + extra_args
+            label = extra_args[-1] if extra_args else "default"
+            logger.info(f"Trying strategy: {label}")
+            result = subprocess.run(download_cmd, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                break
+            logger.warning(f"Strategy '{label}' failed: {result.stderr.strip()[:200]}")
+
+        if result is None or result.returncode != 0:
+            logger.error(f"Download failed: {result.stderr if result else 'No result'}")
             return False, None
         
         elapsed = (datetime.now() - start_time).total_seconds()
@@ -193,7 +212,7 @@ class YouTubeSegmentExtractor:
             "-i", str(full_audio_path),
             "-ss", str(start_seconds),  # Start time in seconds
             "-t", str(duration),        # Duration in seconds
-            "-acodec", "mp3",
+            "-acodec", "libmp3lame",    # Use libmp3lame encoder
             "-ab", "192k",
             str(segment_path),
             "-y"  # Overwrite if exists

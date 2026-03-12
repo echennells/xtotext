@@ -251,11 +251,17 @@ current_droplet.txt
 # API keys and secrets
 .env.local
 .env.production
+.env.*
+!.env.example
 config.json
 secrets.json
 api_keys.txt
 *.key
 *.pem
+*_key.txt
+*_token.txt
+*_secret.txt
+credentials.json
 
 # Digital Ocean and cloud provider files
 .do_token

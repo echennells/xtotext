@@ -1,5 +1,9 @@
 """
 Transcription workflow module - handles the full pipeline of downloading, transcribing, and post-processing
+
+NOTE: This module is not currently used by any root scripts. The active implementation for
+batch channel processing is process_channel.py, which keeps the GPU instance alive across
+all videos in a batch (unlike this module, which tears down the GPU between each video).
 """
 import os
 from pathlib import Path
@@ -12,6 +16,8 @@ from downloaders.youtube_channel_downloader import YouTubeChannelDownloader
 from infrastructure.vast_ai.transcription_runner import TranscriptionRunner
 from processors.claude_transcript_postprocessor import postprocess_transcript_claude
 from database import get_database, log_video, log_postprocessing
+from utils.config_utils import get_vast_api_key
+from utils.transcript_utils import extract_text_from_transcript
 
 
 class TranscriptionWorkflow:
@@ -33,13 +39,7 @@ class TranscriptionWorkflow:
         self.output_base_dir.mkdir(parents=True, exist_ok=True)
         
         # Get Vast.ai API key
-        self.vast_api_key = vast_api_key or os.getenv("VAST_API_KEY")
-        if not self.vast_api_key:
-            try:
-                from config.config import VAST_API_KEY
-                self.vast_api_key = VAST_API_KEY
-            except ImportError:
-                pass
+        self.vast_api_key = vast_api_key or get_vast_api_key()
         
         # Initialize database
         self.db = get_database()
@@ -212,11 +212,7 @@ class TranscriptionWorkflow:
                 # Step 4: Log to database
                 if transcript_file.exists() and video_id:
                     # Calculate stats
-                    with open(transcript_file, 'r') as f:
-                        transcript_data = json.load(f)
-                    text = transcript_data.get('text', '')
-                    if not text and 'segments' in transcript_data:
-                        text = ' '.join(seg.get('text', '') for seg in transcript_data['segments'])
+                    text = extract_text_from_transcript(transcript_file)
                     
                     # Log video
                     db_video_id = log_video(

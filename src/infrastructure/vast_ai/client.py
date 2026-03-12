@@ -75,7 +75,8 @@ class VastAIClient:
         
         response = self.session.get(
             f"{VAST_API_BASE}/bundles",
-            params=params
+            params=params,
+            timeout=30  # Add 30 second timeout
         )
         
         if response.status_code != 200:
@@ -142,7 +143,8 @@ class VastAIClient:
         response = self.session.put(
             f"{VAST_API_BASE}/asks/{offer_id}/",
             json=payload,
-            params=params
+            params=params,
+            timeout=30  # Add 30 second timeout
         )
         
         if response.status_code not in [200, 201]:
@@ -155,7 +157,8 @@ class VastAIClient:
         params = {**self.api_key_param}
         response = self.session.get(
             f"{VAST_API_BASE}/instances/{instance_id}/",
-            params=params
+            params=params,
+            timeout=30  # Add 30 second timeout
         )
         
         if response.status_code != 200:
@@ -170,7 +173,7 @@ class VastAIClient:
     def get_instances(self) -> List[Dict[str, Any]]:
         """Get all instances for the account"""
         params = {**self.api_key_param}
-        response = self.session.get(f"{VAST_API_BASE}/instances/", params=params)
+        response = self.session.get(f"{VAST_API_BASE}/instances/", params=params, timeout=30)
         
         if response.status_code != 200:
             raise RuntimeError(f"Failed to get instances: {response.text}")
@@ -183,7 +186,8 @@ class VastAIClient:
         params = {**self.api_key_param}
         response = self.session.delete(
             f"{VAST_API_BASE}/instances/{instance_id}/",
-            params=params
+            params=params,
+            timeout=30  # Add 30 second timeout
         )
         
         return response.status_code == 200
@@ -208,7 +212,8 @@ class VastAIClient:
         response = self.session.post(
             f"{VAST_API_BASE}/instances/{instance_id}/ssh/",
             json=payload,
-            params=params
+            params=params,
+            timeout=30  # Add 30 second timeout
         )
         
         if response.status_code not in [200, 201]:

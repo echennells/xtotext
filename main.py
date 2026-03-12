@@ -24,31 +24,14 @@ from infrastructure.digital_ocean.simple_runner import SimpleDigitalOceanRunner
 from downloaders.youtube_channel_downloader import YouTubeChannelDownloader
 from processors.claude_transcript_postprocessor import postprocess_transcript_claude
 from database import get_database, log_video, log_postprocessing
+from utils.logging_utils import setup_logging
+from utils.config_utils import get_vast_api_key
+from utils.transcript_utils import extract_text_from_transcript
 
 
 def main():
-    # Set up logging
-    
-    # Create logs directory if it doesn't exist
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
-    
-    # Create log file with timestamp
-    log_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_file = log_dir / f"prediction_extraction_{log_timestamp}.log"
-    
-    # Configure logging to file and console
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler()  # Also log to console
-        ]
-    )
-    
-    logger = logging.getLogger(__name__)
-    logger.info(f"Starting prediction extraction run - Log file: {log_file}")
+    logger = setup_logging('main')
+    logger.info("Starting prediction extraction run")
     
     # Configuration
     channel_url = "https://www.youtube.com/@BitcoinTakeover"
@@ -83,14 +66,7 @@ def main():
         return
     
     # Get Vast.ai API key for DO droplet to use
-    vast_api_key = os.getenv("VAST_API_KEY")
-    if not vast_api_key:
-        try:
-            from config.config import VAST_API_KEY
-            vast_api_key = VAST_API_KEY
-        except ImportError:
-            pass
-    
+    vast_api_key = get_vast_api_key()
     if not vast_api_key:
         print("Error: No Vast.ai API key found (needed for GPU transcription)")
         return
@@ -223,11 +199,7 @@ def main():
         if transcript_file.exists() and video_id:
             try:
                 # Calculate stats
-                with open(transcript_file, 'r') as f:
-                    transcript_data = json.load(f)
-                text = transcript_data.get('text', '')
-                if not text and 'segments' in transcript_data:
-                    text = ' '.join(seg.get('text', '') for seg in transcript_data['segments'])
+                text = extract_text_from_transcript(transcript_file)
                 
                 # Log the video
                 db_video_id = log_video(

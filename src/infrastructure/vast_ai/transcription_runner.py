@@ -13,7 +13,7 @@ from .config import (
     WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE_TYPE,
     REMOTE_WORKSPACE, REMOTE_AUDIO_DIR, REMOTE_OUTPUT_DIR
 )
-from utils.filename_utils import sanitize_filename
+from src.utils.filename_utils import sanitize_filename
 
 
 class TranscriptionRunner:
@@ -31,27 +31,29 @@ class TranscriptionRunner:
     ) -> Dict[str, Any]:
         """
         Set up a GPU instance for transcription with retry logic
-        
+
         Args:
             gpu_type: Type of GPU to request
             max_price: Maximum hourly price
             max_retries: Maximum number of retries for dud instances
-        
+
         Returns:
             Instance details
         """
         last_error = None
-        
+        blacklisted_offers = []  # Track failed offers to avoid retrying the same one
+
         for attempt in range(1, max_retries + 1):
             print(f"\n{'='*60}")
             print(f"GPU Instance Setup - Attempt {attempt}/{max_retries}")
             print(f"{'='*60}")
-            
+
             try:
-                # Create or get existing instance
+                # Create or get existing instance, avoiding blacklisted offers
                 instance = self.instance_manager.create_transcription_instance(
                     gpu_type=gpu_type,
-                    max_price=max_price
+                    max_price=max_price,
+                    blacklisted_offers=blacklisted_offers
                 )
                 
                 # Establish SSH connection
@@ -77,18 +79,27 @@ class TranscriptionRunner:
             except (TimeoutError, RuntimeError) as e:
                 last_error = e
                 print(f"\n⚠ Attempt {attempt} failed: {str(e)}")
-                
+
+                # Blacklist this offer if it was an "already rented" error
+                if self.instance_manager.current_instance and "already rented" in str(e):
+                    offer_id = self.instance_manager.current_instance.get('offer_id')
+                    if offer_id and offer_id not in blacklisted_offers:
+                        blacklisted_offers.append(offer_id)
+                        print(f"Blacklisting offer {offer_id}")
+
                 # Clean up the failed instance
                 if self.instance_manager.current_instance:
-                    print(f"Destroying failed instance {self.instance_manager.current_instance['id']}...")
-                    try:
-                        self.instance_manager.destroy_current_instance()
-                    except Exception as cleanup_error:
-                        print(f"Warning: Failed to destroy instance: {cleanup_error}")
-                
+                    instance_id = self.instance_manager.current_instance.get('id')
+                    if instance_id:
+                        print(f"Destroying failed instance {instance_id}...")
+                        try:
+                            self.instance_manager.destroy_current_instance()
+                        except Exception as cleanup_error:
+                            print(f"Warning: Failed to destroy instance: {cleanup_error}")
+
                 # Reset SSH connection
                 self.ssh_connection = None
-                
+
                 if attempt < max_retries:
                     print(f"\nRetrying with a different GPU instance...")
                     # Wait a bit before retrying
@@ -276,7 +287,7 @@ class TranscriptionRunner:
         ret, out, err = self.ssh_connection.execute_command("python3 --version")
         if ret != 0:
             raise RuntimeError("Python not available on instance")
-        
+
         # Check Whisper
         ret, out, err = self.ssh_connection.execute_command(
             "python3 -c 'import whisper; print(whisper.__version__)'"
@@ -284,7 +295,11 @@ class TranscriptionRunner:
         if ret != 0:
             print("Installing Whisper...")
             self._install_dependencies()
-        
+
+        # Pre-download Whisper models to cache them
+        print("Pre-downloading Whisper models...")
+        self._download_whisper_models()
+
         # Check GPU and CUDA
         print("Checking GPU...")
         ret, out, err = self.ssh_connection.execute_command("nvidia-smi")
@@ -294,7 +309,7 @@ class TranscriptionRunner:
         else:
             print("nvidia-smi output:")
             print(out)
-        
+
         # Test CUDA initialization
         print("Testing CUDA...")
         cuda_test = '''
@@ -323,37 +338,78 @@ else:
             raise RuntimeError("CUDA is not available on this instance - likely a dud GPU")
         else:
             print(f"CUDA test output: {out}")
-        
+
         print("Instance setup verified")
     
     def _install_dependencies(self):
         """Install required dependencies on the instance"""
         print("Installing dependencies...")
-        
+
         install_script = """
         # Update system and install required packages
         apt-get update -qq
-        apt-get install -y -qq python3 python3-pip ffmpeg git
-        
+        apt-get install -y -qq python3 python3-pip ffmpeg git pkg-config libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev libswscale-dev libswresample-dev
+
         # Upgrade pip
         python3 -m pip install --upgrade pip
-        
+
         # Install PyTorch with CUDA support first
         python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-        
+
         # Install whisper packages
         python3 -m pip install openai-whisper
-        # Pin faster-whisper to version that works with cuDNN 8
-        python3 -m pip install faster-whisper==0.10.0
+
+        # Install tokenizers first with a pre-built wheel to avoid build issues
+        python3 -m pip install 'tokenizers>=0.19.0,<0.21.0'
+
+        # Use newer faster-whisper that's compatible with available ffmpeg
+        python3 -m pip install faster-whisper
         """
-        
+
         ret, out, err = self.ssh_connection.execute_command(
             install_script,
             stream_output=True
         )
-        
+
         if ret != 0:
             raise RuntimeError(f"Failed to install dependencies: {err}")
+
+    def _download_whisper_models(self):
+        """Pre-download Whisper models to avoid runtime download failures"""
+        # Download the most commonly used models
+        models_to_download = ['tiny', 'base', 'small', 'medium']
+
+        for model in models_to_download:
+            print(f"Downloading Whisper {model} model...")
+            download_script = f'''
+import whisper
+import os
+
+# Create cache directory if it doesn't exist
+cache_dir = os.path.expanduser("~/.cache/whisper")
+os.makedirs(cache_dir, exist_ok=True)
+
+print(f"Downloading {model} model to {{cache_dir}}...")
+try:
+    model_obj = whisper.load_model("{model}", download_root=cache_dir)
+    print(f"✓ {model} model downloaded successfully")
+except Exception as e:
+    print(f"✗ Failed to download {model} model: {{e}}")
+    exit(1)
+'''
+
+            ret, out, err = self.ssh_connection.execute_command(
+                f"python3 -c '{download_script}'",
+                timeout=300  # 5 minute timeout for model downloads
+            )
+
+            if ret != 0:
+                print(f"Warning: Failed to download {model} model: {err}")
+                # Don't fail entirely, just warn - the model might download later
+            else:
+                print(f"✓ {model} model cached")
+
+        print("Whisper models pre-downloaded")
     
     def _run_whisper(
         self,

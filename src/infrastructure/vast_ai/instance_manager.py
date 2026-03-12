@@ -38,7 +38,8 @@ class InstanceManager:
         max_price: float = DEFAULT_MAX_PRICE,
         exclude_countries: List[str] = None,
         prefer_verified: bool = True,
-        min_reliability: float = 98.0
+        min_reliability: float = 98.0,
+        blacklisted_offers: List[int] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Find the best available GPU instance for transcription
@@ -58,7 +59,7 @@ class InstanceManager:
         """
         if exclude_countries is None:
             # Exclude countries where connections are problematic
-            exclude_countries = ['CN', 'BG', 'RO', 'RU', 'ZA', 'UA']  # China, Bulgaria, Romania, Russia, South Africa, Ukraine
+            exclude_countries = ['CN', 'BG', 'RO', 'RU', 'ZA', 'UA', 'IN', 'CA', 'AR']  # China, Bulgaria, Romania, Russia, South Africa, Ukraine, India, Canada, Argentina
             
         print(f"Searching for {gpu_type} instances...")
         
@@ -81,19 +82,27 @@ class InstanceManager:
                 max_price=max_price
             )
         
-        # Filter out excluded countries and low reliability
+        # Filter out excluded countries, low reliability, and blacklisted offers
+        if blacklisted_offers is None:
+            blacklisted_offers = []
+
         filtered_offers = []
         for offer in offers:
             location = offer.get('geolocation', '')
             reliability = offer.get('reliability2', offer.get('reliability', 0)) * 100
-            
+            offer_id = offer.get('id')
+
             # Check country exclusion
             exclude = False
             for country in exclude_countries:
                 if country in location:
                     exclude = True
                     break
-            
+
+            # Check if blacklisted
+            if offer_id in blacklisted_offers:
+                exclude = True
+
             if not exclude and reliability >= min_reliability:
                 filtered_offers.append(offer)
         
@@ -140,7 +149,8 @@ class InstanceManager:
         disk_size: int = DEFAULT_MIN_DISK,
         exclude_countries: List[str] = None,
         ubuntu_version: str = "22.04",
-        ssh_key_path: Optional[Path] = None
+        ssh_key_path: Optional[Path] = None,
+        blacklisted_offers: List[int] = None
     ) -> Dict[str, Any]:
         """
         Create a new GPU instance optimized for transcription
@@ -162,13 +172,17 @@ class InstanceManager:
             print(f"Already have instance {existing['id']} running")
             return existing
         
-        # Find best offer
+        # Find best offer, excluding blacklisted ones
+        if blacklisted_offers is None:
+            blacklisted_offers = []
+
         offer = self.find_best_instance(
             gpu_type=gpu_type,
             max_price=max_price,
-            exclude_countries=exclude_countries
+            exclude_countries=exclude_countries,
+            blacklisted_offers=blacklisted_offers
         )
-        
+
         if not offer:
             raise RuntimeError(f"No suitable {gpu_type} instances available")
         
